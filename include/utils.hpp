@@ -22,6 +22,15 @@ struct Bdecode {
 		std::vector<Bdeptr>, 
 		std::map<std::string, Bdeptr> 
 	>;
+	Bvars value;
+};
+
+enum Charcodes : unsigned char {
+	B_INT = 'i',
+	B_LIST = 'l',
+	B_DICT = 'd',
+	B_END = 'e',
+	B_STR = ':',
 };
 
 /* Bencoded file parser, returns a Bdeptr to a tree of values */
@@ -29,17 +38,19 @@ class Bdecoder {
 
 public:
     explicit Bdecoder(const std::vector<unsigned char>& data);
-    std::shared_ptr<Bdecode> decode();
+    Bdeptr decode();
 
 private:
-    std::shared_ptr<Bdecode> parseValue();
-    std::shared_ptr<Bdecode> parseInt();
-    std::shared_ptr<Bdecode> parseString();
-    std::shared_ptr<Bdecode> parseList();
-    std::shared_ptr<Bdecode> parseDict();
-
+    Bdeptr parseValue();
+    Bdeptr parseInt();
+    Bdeptr parseString();
+    Bdeptr parseList();
+    Bdeptr parseDict();
+	
     const std::vector<unsigned char>& data_;
     size_t pos_ = 0;
 };
+
+void Bprint(Bdeptr node, int indent);
 
 #endif /* utils.hpp */

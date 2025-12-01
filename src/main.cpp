@@ -1,10 +1,9 @@
-#include <asio.hpp>
+#include <boost/asio.hpp>
 #include <fstream>
 #include <iostream>
 #include <utils.hpp>
 
 using namespace std;
-
 
 int main(int argc, char *argv[])
 {
@@ -31,6 +30,11 @@ int main(int argc, char *argv[])
 	);
 
 	Bdecoder decoder(file_data);
+
+	shared_ptr<Bdecode> root = decoder.decode();
+	
+	Bprint(root, 0);
+
 
 	/*
 	try {
