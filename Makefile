@@ -14,7 +14,7 @@ TRACKER_TARGET = tracker
 
 # Source files
 CLIENT_SRCS = $(SRC_DIR)/client.cpp $(SRC_DIR)/peer.cpp $(SRC_DIR)/utils.cpp
-TRACKER_SRCS = $(SRC_DIR)/tracker.cpp $(SRC_DIR)/utils.cpp
+TRACKER_SRCS = $(SRC_DIR)/tracker.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/tracker_impl.cpp $(SRC_DIR)/peer.cpp
 
 # Object files
 CLIENT_OBJS = $(CLIENT_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
