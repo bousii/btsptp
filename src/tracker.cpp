@@ -1,170 +1,98 @@
 #include <bencode.hpp>
+#include <peer.hpp>
 #include <tracker.hpp>
-#include <boost/asio.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <fstream>
-#include <iostream>
-#include <utils.hpp>
+#include <algorithm>
 
-using namespace std;
-using boost::asio::ip::tcp;
+Tracker::Tracker(int interval, int timeout)
+	: announce_interval(interval), peer_timeout(timeout) {}
 
-struct HttpRequest {
-    string method;
-    string path;
-    string query;
-    string http_version;
-};
-
-#define TRACKER_PORT 8080
-
-void send_response(tcp::socket &socket, const string &data)
+std::string Tracker::handle_announce(const std::string &info_hash,
+							const std::string &peer_id,
+							const std::string &ip,
+							uint16_t port,
+							const std::string &event)
 {
-	string http_header = "HTTP/1.1 200 OK \r\n";
-	http_header += "Content-Type: text/plain\r\n";
-	http_header += "Content-Length: " + to_string(data.size()) + "\r\n";
-	http_header += "\r\n";
+	Peer peer(peer_id, ip, port);
+	peer.last_announce = time(nullptr);
+	peer.status = event;
 
-	boost::asio::write(socket, boost::asio::buffer(http_header));
-	boost::asio::write(socket, boost::asio::buffer(data));
+	update_peer(info_hash, peer);
+	return generate_response(info_hash, peer.peer_id);
 }
 
-HttpRequest parse_http_request_line(const std::string& request_line) {
-    std::istringstream line_stream(request_line);
-    HttpRequest req;
-    line_stream >> req.method >> req.path >> req.http_version;
-    auto qmark_pos = req.path.find('?');
-    if (qmark_pos != std::string::npos)
-        req.query = req.path.substr(qmark_pos + 1);
-    return req;
-}
-
-string url_decode(const std::string& str)
+std::string Tracker::generate_response(const std::string &info_hash, const std::string &caller_id)
 {
-    string result;
-    for (size_t i = 0; i < str.length(); i++) {
-        if (str[i] == '%' && i + 2 < str.length()) {
-            int value;
-            istringstream iss(str.substr(i + 1, 2));
-            if (iss >> hex >> value) {
-                result += static_cast<char>(value);
-                i += 2;
-            }
-        } else if (str[i] == '+') {
-            result += ' ';
-        } else {
-            result += str[i];
-        }
+    auto it = torrents.find(info_hash);
+    if (it == torrents.end()) {
+        bencode::dict response;
+        response["interval"] = (long long)announce_interval;
+        response["peers"] = bencode::list();
+        return bencode::encode(response);
     }
-    return result;
-}
 
-unordered_map<std::string, std::string> parse_query(const std::string& query)
-{
-    unordered_map<std::string, std::string> params;
-    istringstream ss(query);
-    string pair;
-    while (std::getline(ss, pair, '&')) {
-        auto eq_pos = pair.find('=');
-        if (eq_pos != string::npos) {
-            string key = pair.substr(0, eq_pos);
-            string value = url_decode(pair.substr(eq_pos + 1));
-            params[key] = value;
-        }
+    const std::vector<Peer> &peer_list = it->second;
+
+    bencode::list peers;
+    for (const auto &peer : peer_list) {
+		if (peer.peer_id == caller_id) {
+			continue;
+		}
+        bencode::dict peer_dict;
+        peer_dict["peer id"] = peer.peer_id;
+        peer_dict["ip"] = peer.ip;
+        peer_dict["port"] = (long long)peer.port;
+        peers.push_back(peer_dict);
     }
-    return params;
+
+    bencode::dict response;
+    response["interval"] = (long long)announce_interval;
+    response["peers"] = peers;
+
+    return bencode::encode(response);
 }
 
-void handle_client(tcp::socket &socket, Tracker &tracker)
+void Tracker::cleanup_inactive_peers()
 {
-	try {
-	
-		boost::asio::streambuf buffer;
-		boost::asio::read_until(socket, buffer, "\r\n\r\n"); /* End of HTTP header */
-	
-		istream request_stream(&buffer);
-		string request_line;
-		getline(request_stream, request_line);
+    time_t current_time = time(nullptr);
 
-		if (request_line.back() == '\r') {
-			request_line.pop_back();
+    for (auto &[info_hash, peer_list] : torrents) {
+        peer_list.erase(
+            std::remove_if(peer_list.begin(), peer_list.end(),
+                [this, current_time](const Peer &peer) {
+                    return (current_time - peer.last_announce) > peer_timeout;
+                }),
+            peer_list.end()
+        );
+    }
+}
+
+void Tracker::update_peer(const std::string &info_hash, const Peer &peer)
+{
+	auto &peer_list = torrents[info_hash];
+
+	bool exists = false;
+	for (auto &existing_peer : peer_list) {
+		if (peer.peer_id != existing_peer.peer_id) {
+			continue;
 		}
+		existing_peer.ip = peer.ip;
+		existing_peer.port = peer.port;
+		existing_peer.status = peer.status;
+		existing_peer.last_announce = time(nullptr);
+		exists = true;
+		break;
+	}
 
-		HttpRequest request = parse_http_request_line(request_line);
-
-		if (request.method != "GET") {
-			std::cerr << "Bad request: not GET" << endl;
-			return;
-		}
-
-        auto qmark_pos = request.path.find('?');
-        std::string query_str;
-        if (qmark_pos != std::string::npos) {
-            query_str = request.path.substr(qmark_pos + 1);
-        }
- 		auto params = parse_query(query_str);
-
-        /* Extract required components safely */
-        std::string info_hash, peer_id, event = "";
-        uint16_t port = 0;
-        int64_t uploaded = 0, downloaded = 0, left = 0;
-
-        try {
-            if (params.count("info_hash") != 1 || params["info_hash"].size() != 20) throw std::runtime_error("Invalid info_hash");
-            info_hash = params["info_hash"];
-
-            if (params.count("peer_id") != 1 || params["peer_id"].size() != 20) throw std::runtime_error("Invalid peer_id");
-            peer_id = params["peer_id"];
-
-            if (params.count("port") != 1) throw std::runtime_error("Missing port");
-            port = static_cast<uint16_t>(std::stoi(params["port"]));
-
-            if (params.count("uploaded")) uploaded = std::stoll(params["uploaded"]);
-            if (params.count("downloaded")) downloaded = std::stoll(params["downloaded"]);
-            if (params.count("left")) left = std::stoll(params["left"]);
-            if (params.count("event")) event = params["event"];
-        } catch (const std::exception& e) {
-            std::cerr << "Bad announce request: " << e.what() << "\n";
-            return;
-        }
-
-        std::cout << "Peer connected: info_hash=" << info_hash
-                  << " peer_id=" << peer_id
-                  << " port=" << port
-                  << " uploaded=" << uploaded
-                  << " downloaded=" << downloaded
-                  << " left=" << left
-                  << " event=" << event
-                  << "\n";
-
-		auto ip = socket.remote_endpoint().address().to_string();
-		string response = tracker.handle_announce(info_hash, peer_id, ip, port, event);
-		send_response(socket, response);
-
-	} catch (const exception &e) {
-		std::cerr << "exception handling client: " << e.what() << endl;
+	if (!exists) {
+		peer_list.push_back(peer);
 	}
 }
 
-int main()
+int Tracker::get_peer_count(const std::string &info_hash) const
 {
-	try {
-		boost::asio::io_context io;
-        tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), TRACKER_PORT));
-
-		cout << "tracker listening on port " << TRACKER_PORT << endl;
-		Tracker tracker;
-		while(1) {
-			tcp::socket socket(io);
-			acceptor.accept(socket);
-			auto remote_endpoint = socket.remote_endpoint();
-			string client_ip = remote_endpoint.address().to_string();
-			cout << "client connected: " << remote_endpoint <<  endl;
-			handle_client(socket, tracker);
-		}
-	} catch (std::exception& e) {
-	    cerr << "Error: " << e.what() << endl;
+	auto it = torrents.find(info_hash);
+	if (it == torrents.end()) {
+		return -1;
 	}
-
-	return 0;
+	return it->second.size();
 }

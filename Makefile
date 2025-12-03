@@ -13,8 +13,8 @@ CLIENT_TARGET = torrent_client
 TRACKER_TARGET = tracker
 
 # Source files
-CLIENT_SRCS = $(SRC_DIR)/client.cpp $(SRC_DIR)/peer.cpp $(SRC_DIR)/utils.cpp
-TRACKER_SRCS = $(SRC_DIR)/tracker.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/tracker_impl.cpp $(SRC_DIR)/peer.cpp
+CLIENT_SRCS = $(SRC_DIR)/btsptp_client.cpp $(SRC_DIR)/peer.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/torrent_metadata.cpp
+TRACKER_SRCS = $(SRC_DIR)/tracker_server.cpp $(SRC_DIR)/tracker.cpp $(SRC_DIR)/peer.cpp $(SRC_DIR)/utils.cpp
 
 # Object files
 CLIENT_OBJS = $(CLIENT_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
@@ -22,20 +22,14 @@ TRACKER_OBJS = $(TRACKER_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 
 all: client tracker
 
-# Build client only
-client: $(CLIENT_TARGET)
-
-# Build tracker only
-tracker: $(TRACKER_TARGET)
-
-# Link client
-$(CLIENT_TARGET): $(CLIENT_OBJS)
-	$(CXX) $(CXXFLAGS) $(CLIENT_OBJS) -o $@ $(LDFLAGS)
+# Build client
+client: $(CLIENT_OBJS)
+	$(CXX) $(CXXFLAGS) $(CLIENT_OBJS) -o $(CLIENT_TARGET) $(LDFLAGS)
 	@echo "Built $(CLIENT_TARGET)"
 
-# Link tracker
-$(TRACKER_TARGET): $(TRACKER_OBJS)
-	$(CXX) $(CXXFLAGS) $(TRACKER_OBJS) -o $@ $(LDFLAGS)
+# Build tracker
+tracker: $(TRACKER_OBJS)
+	$(CXX) $(CXXFLAGS) $(TRACKER_OBJS) -o $(TRACKER_TARGET) $(LDFLAGS)
 	@echo "Built $(TRACKER_TARGET)"
 
 # Compile source files from src/
