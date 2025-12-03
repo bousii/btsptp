@@ -22,7 +22,7 @@ public:
 								const std::string &ip,
 								uint16_t port,
 								const std::string &event);
-	std::string generate_response(const std::string &info_hash);
+	std::string generate_response(const std::string &info_hash, const std::string &caller_id);
 	void cleanup_inactive_peers();
 	void update_peer(const std::string &info_hash, const Peer &peer);
 	int get_peer_count(const std::string &info_hash) const;

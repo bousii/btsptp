@@ -17,10 +17,10 @@ std::string Tracker::handle_announce(const std::string &info_hash,
 	peer.status = event;
 
 	update_peer(info_hash, peer);
-	return generate_response(info_hash);
+	return generate_response(info_hash, peer.peer_id);
 }
 
-std::string Tracker::generate_response(const std::string &info_hash)
+std::string Tracker::generate_response(const std::string &info_hash, const std::string &caller_id)
 {
     auto it = torrents.find(info_hash);
     if (it == torrents.end()) {
@@ -34,6 +34,9 @@ std::string Tracker::generate_response(const std::string &info_hash)
 
     bencode::list peers;
     for (const auto &peer : peer_list) {
+		if (peer.peer_id == caller_id) {
+			continue;
+		}
         bencode::dict peer_dict;
         peer_dict["peer id"] = peer.peer_id;
         peer_dict["ip"] = peer.ip;
@@ -65,10 +68,13 @@ void Tracker::cleanup_inactive_peers()
 
 void Tracker::update_peer(const std::string &info_hash, const Peer &peer)
 {
-	auto peer_list = torrents[info_hash];
+	auto &peer_list = torrents[info_hash];
 
 	bool exists = false;
 	for (auto &existing_peer : peer_list) {
+		if (peer.peer_id != peer.peer_id) {
+			continue;
+		}
 		existing_peer.ip = peer.ip;
 		existing_peer.port = peer.port;
 		existing_peer.status = peer.status;
