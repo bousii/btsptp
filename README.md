@@ -8,9 +8,7 @@ This is a functional BitTorrent client implementation that supports downloading 
 
 ### Language
 
-**C++20** - This project is implemented in C++ using C++20 features including:
-- Structured bindings
-- Standard threading primitives
+**C++20** - This project is implemented in C++
 
 ### External Libraries
 
@@ -138,7 +136,7 @@ The tracker will:
 - Maintain a list of active peers for each torrent
 - Return peer lists to requesting clients
 - Remove stale peers that haven't announced recently
-- Log all activity to console
+- Log activity to console
 
 ## Running the Client
 
