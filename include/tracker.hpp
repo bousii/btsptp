@@ -10,7 +10,7 @@
 
 class Tracker {
 private:
-	std::unordered_map<std::string, std::vector<Peer>> torrents;
+	std::unordered_map<std::string, std::vector<PeerInfo>> torrents;
 	int announce_interval;
 	int peer_timeout;
 
@@ -24,7 +24,7 @@ public:
 								const std::string &event);
 	std::string generate_response(const std::string &info_hash, const std::string &caller_id);
 	void cleanup_inactive_peers();
-	void update_peer(const std::string &info_hash, const Peer &peer);
+	void update_peer(const std::string &info_hash, const PeerInfo &peer);
 	int get_peer_count(const std::string &info_hash) const;
 };
 

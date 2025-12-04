@@ -12,7 +12,7 @@ std::string Tracker::handle_announce(const std::string &info_hash,
 							uint16_t port,
 							const std::string &event)
 {
-	Peer peer(peer_id, ip, port);
+	PeerInfo peer(peer_id, ip, port);
 	peer.last_announce = time(nullptr);
 	peer.status = event;
 
@@ -30,7 +30,7 @@ std::string Tracker::generate_response(const std::string &info_hash, const std::
         return bencode::encode(response);
     }
 
-    const std::vector<Peer> &peer_list = it->second;
+    const std::vector<PeerInfo> &peer_list = it->second;
 
     bencode::list peers;
     for (const auto &peer : peer_list) {
@@ -58,7 +58,7 @@ void Tracker::cleanup_inactive_peers()
     for (auto &[info_hash, peer_list] : torrents) {
         peer_list.erase(
             std::remove_if(peer_list.begin(), peer_list.end(),
-                [this, current_time](const Peer &peer) {
+                [this, current_time](const PeerInfo &peer) {
                     return (current_time - peer.last_announce) > peer_timeout;
                 }),
             peer_list.end()
@@ -66,7 +66,7 @@ void Tracker::cleanup_inactive_peers()
     }
 }
 
-void Tracker::update_peer(const std::string &info_hash, const Peer &peer)
+void Tracker::update_peer(const std::string &info_hash, const PeerInfo &peer)
 {
 	auto &peer_list = torrents[info_hash];
 

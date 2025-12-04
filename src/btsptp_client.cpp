@@ -8,21 +8,10 @@
 
 using namespace std;
 
-
-std::string parse_http_response_body(const std::string &http_response)
-{
-	boost::asio::streambuf buffer;
-	boost::asio::read_until(socket, buffer, "\r\n\r\n"); /* End of HTTP header */
-
-	istream request_stream(&buffer);
-	string request_line;
-	getline(request_stream, request_line);
-
-	if (request_line.back() == '\r') {
-		request_line.pop_back();
-	}
-
-}
+struct tracker_resp {
+	vector<PeerInfo> peer_list;
+	long long interval;
+};
 
 std::string build_http_get_request(const std::string &announce_request,
 								   const std::string &host,
@@ -39,10 +28,11 @@ std::string build_http_get_request(const std::string &announce_request,
 
 	return req.str();
 }
-vector<Peer> announce_to_tracker(boost::asio::io_context &io, string announce_url,
+
+tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_url,
 								 string announce_request)
 {
-	vector<Peer> peer_list;
+	vector<PeerInfo> peer_list;
 
 	boost::asio::ip::tcp::socket tracker_socket(io);
 	boost::asio::ip::tcp::resolver resolver(io);
@@ -53,37 +43,97 @@ vector<Peer> announce_to_tracker(boost::asio::io_context &io, string announce_ur
 
 	string get_request = build_http_get_request(announce_request, url.host, url.port);
 
+	/* Send request */
+	boost::asio::write(tracker_socket, boost::asio::buffer(get_request));
 
-	boost::asio::write(socket, boost::asio::buffer(get_request));
-
-    boost::asio::streambuf response_buf;
-    boost::system::error_code ec;
-    boost::asio::read(socket, response_buf, boost::asio::transfer_all(), ec);
-    if (ec && ec != boost::asio::error::eof) {
-        throw boost::system::system_error(ec);
-    }
-
-    std::string response(
-        boost::asio::buffers_begin(response_buf.data()),
-        boost::asio::buffers_end(response_buf.data())
-    );
-
-    // Strip headers
-    auto header_end = response.find("\r\n\r\n");
-    if (header_end == std::string::npos) {
-        throw std::runtime_error("Invalid HTTP response: missing header-body separator");
-    }
-    std::string body = response.substr(header_end + 4);
-	auto data = bencode::decode(body);
-
-	auto root_dict = get<bencode::dict>(data);
-
-	if (root_dict.count("interval")) {
-		
+	/* Read until end of headers */
+	boost::asio::streambuf response_buf;
+	boost::system::error_code ec;
+	boost::asio::read_until(tracker_socket, response_buf, "\r\n\r\n", ec);
+	if (ec) {
+		throw boost::system::system_error(ec);
 	}
 
-	return peer_list;
+	/* Parse headers using istream */
+	std::istream response_stream(&response_buf);
+	std::string http_version;
+	unsigned int status_code;
+	std::string status_message;
+	
+	response_stream >> http_version >> status_code;
+	std::getline(response_stream, status_message);
+	
+	/* Read headers and find Content-Length */
+	size_t content_length = 0;
+	std::string header_line;
+	while (std::getline(response_stream, header_line) && header_line != "\r") {
+		if (header_line.find("Content-Length: ") == 0) {
+			content_length = std::stoul(header_line.substr(16));
+		}
+	}
+	
+	std::cout << "Content-Length from header: " << content_length << std::endl;
+
+	/*
+	 * At this point, response_buf still contains any body data that came with headers
+	 * Calculate how much body we already have
+	 */
+	size_t body_in_buffer = response_buf.size();
+	std::cout << "Body already in buffer: " << body_in_buffer << std::endl;
+	
+	/* Read remaining body if needed */
+	if (body_in_buffer < content_length) {
+		size_t remaining = content_length - body_in_buffer;
+		std::cout << "Reading remaining: " << remaining << " bytes" << std::endl;
+		
+		boost::asio::read(tracker_socket, response_buf, 
+						  boost::asio::transfer_exactly(remaining), ec);
+		if (ec) {
+			throw boost::system::system_error(ec);
+		}
+	}
+	
+    string body {
+		istreambuf_iterator<char>(&response_buf),
+		istreambuf_iterator<char>()
+	};
+	
+	std::cout << "Final body size: " << body.size() << std::endl;
+	std::cout << "First 100 chars of body: " << body.substr(0, 100) << std::endl;
+
+	/* Parse bencoded response */
+	auto data = bencode::decode(body);
+	auto root_dict = get<bencode::dict>(data);
+
+	auto interval = 30;
+	if (root_dict.count("interval")) {
+		interval = get<bencode::integer>(root_dict["interval"]);
+	} else {
+		throw std::runtime_error("No interval provided from tracker");
+	}
+
+	if (!root_dict.count("peers")) {
+		throw std::runtime_error("No peers list provided from tracker");
+	}
+	
+	vector<bencode::data> peer_data = get<bencode::list>(root_dict["peers"]);
+	for (auto &one_data : peer_data) {
+		auto peer_dict = get<bencode::dict>(one_data);
+		auto peer_id = get<bencode::string>(peer_dict["peer id"]);
+		auto peer_ip = get<bencode::string>(peer_dict["ip"]);
+		auto peer_port = get<bencode::integer>(peer_dict["port"]);
+		PeerInfo peer(peer_id, peer_ip, peer_port);
+		peer_list.push_back(peer);
+	}
+
+	tracker_resp resp;
+	resp.interval = interval;
+	resp.peer_list = peer_list;
+
+	return resp;
 }
+
+
 int main(int argc, char *argv[]) {
     if (argc < 2) {
         cout << "too few arguments for this program" << endl;
@@ -127,9 +177,8 @@ int main(int argc, char *argv[]) {
         cout << "=== announce request ===" << endl;
         cout << announce_request << endl;
 
-		/* Let OS assign random listening port */
+		tracker_resp resp = announce_to_tracker(io, torrent.announce_url, announce_request);
 
-		vector<Peer> peer_list = announce_to_tracker(io, torrent.announce_url, announce_request);
 
 
     } catch (const exception& e) {

@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <ctime>
 
-class Peer {
+class PeerInfo {
 public:
 	std::string peer_id;
 	std::string ip;
@@ -13,7 +13,7 @@ public:
 	std::string status;
 	time_t last_announce;
 
-	Peer(std::string id, std::string ip, uint16_t port);
+	PeerInfo(std::string id, std::string ip, uint16_t port);
 };
 
 #endif /* peer.hpp */
