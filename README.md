@@ -43,7 +43,7 @@ This is a functional BitTorrent client implementation that supports downloading 
 
 **WARNING** Use Linux or macOS for guaranteed compatibility. Windows users should consider WSL (Windows Subsystem for Linux).
 
-## Prerequisites
+## Dependencies
 
 ### For Building and Running the Client
 
@@ -68,6 +68,15 @@ This is a functional BitTorrent client implementation that supports downloading 
   - Install on macOS:
 ```bash
      brew install make
+```
+
+4. **OpenSSL**
+```bash
+  sudo apt-get install libssl-dev
+```
+  - Install on macOS:
+```bash
+    brew install openssl
 ```
 
 ### For Creating Torrents
