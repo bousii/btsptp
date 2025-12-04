@@ -25,6 +25,9 @@ public:
 	std::string read_piece(int index);
 	bool is_file_complete();
 	int bytes_left();
+	int get_total_pieces();
+	int get_piece_length();
+	TorrentMetadata get_metadata();
 };
 
 #endif /* torrent_state.hpp */

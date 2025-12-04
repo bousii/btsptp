@@ -8,6 +8,18 @@
 #include "peer_info.hpp"
 #include "torrent_state.hpp"
 
+enum PEER_MSG {
+	MSG_CHOKE,
+	MSG_UNCHOKE,
+	MSG_INTERESTED,
+	MSG_NOT_INTERESTED,
+	MSG_HAVE,
+	MSG_BITFIELD,
+	MSG_REQUEST,
+	MSG_PIECE,
+	MSG_CANCEL,
+};
+
 class PeerConnection {
 private:
 
@@ -70,7 +82,10 @@ public:
     void start_with_socket(boost::asio::ip::tcp::socket socket);
 
     /* Protocol */
-    void perform_handshake();
+    void send_handshake();
+	void receive_handshake();
+	std::vector<uint8_t> build_handshake();
+	void validate_handshake(const std::vector<uint8_t> &response);
 
     /* Main message loop (run in thread) */
     void run();

@@ -13,7 +13,7 @@ CLIENT_TARGET = torrent_client
 TRACKER_TARGET = tracker
 
 # Source files
-CLIENT_SRCS = $(SRC_DIR)/btsptp_client.cpp $(SRC_DIR)/peer_info.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/torrent_metadata.cpp $(SRC_DIR)/torrent_state.cpp
+CLIENT_SRCS = $(SRC_DIR)/btsptp_client.cpp $(SRC_DIR)/peer_info.cpp $(SRC_DIR)/utils.cpp $(SRC_DIR)/torrent_metadata.cpp $(SRC_DIR)/torrent_state.cpp $(SRC_DIR)/peer_connection.cpp
 TRACKER_SRCS = $(SRC_DIR)/tracker_server.cpp $(SRC_DIR)/tracker.cpp $(SRC_DIR)/peer_info.cpp $(SRC_DIR)/utils.cpp
 
 # Object files

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <cstdint>
+#include <vector>
 
 struct HttpRequest {
 	std::string method;
@@ -33,4 +34,6 @@ std::string build_announce_request(const std::string& announce_url,
                                    const std::string& event);
 URL parse_url(const std::string &url);
 HttpRequest parse_http_request_line(const std::string& request_line);
+std::string pack_bitfield(const std::vector<bool>& pieces);
+std::vector<bool> unpack_bitfield(const std::string& packed, size_t num_pieces);
 #endif /* utils.hpp */

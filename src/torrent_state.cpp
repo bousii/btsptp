@@ -153,3 +153,17 @@ int TorrentState::bytes_left()
 	return bytes_left;
 }
 
+int TorrentState::get_total_pieces()
+{
+	return metadata.piece_hashes.size();
+}
+
+int TorrentState::get_piece_length()
+{
+	return metadata.piece_length;
+}
+
+TorrentMetadata TorrentState::get_metadata()
+{
+	return metadata;
+}
