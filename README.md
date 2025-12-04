@@ -33,7 +33,7 @@ This is a functional BitTorrent client implementation that supports downloading 
 
 **Primary Platform:** Linux/Unix (POSIX-compliant systems)
 
-**Windows Compatibility:** This project was initially created to be cross platform, using Boost libraries to enable this. However, some later editions of signal handling makes this unlikely to work on raw Windows. If you're on windows, using WSL or Cygwin would be much more likely to work.
+**Windows Compatibility:** This project was initially created to be cross platform, using Boost libraries to enable this. However, some later editions of signal handling makes this unlikely to work on raw Windows. If you're on windows, WSL is tested to work.
 
 ⚠️ **This implementation has NOT been tested on Windows and may require modifications:**
 - Signal handling (SIGINT, SIGTERM) uses POSIX signals - Windows uses different mechanisms
@@ -41,7 +41,7 @@ This is a functional BitTorrent client implementation that supports downloading 
 - Thread detachment behavior may differ
 - Socket timeout handling could vary
 
-**WARNING** Use Linux or macOS for guaranteed compatibility. Windows users should consider WSL (Windows Subsystem for Linux).
+**WARNING** Use Linux or macOS for guaranteed compatibility. Windows users should consider WSL (Windows Subsystem for Linux), as it has been tested to work.
 
 ## Dependencies
 
@@ -137,10 +137,13 @@ The tracker coordinates peers and maintains the swarm for each torrent.
 
 ### Start the Tracker
 ```bash
-./tracker
+./tracker <port_number>
 ```
 
-This starts the tracker listening on `http://<tracker_ip>:8080/announce`
+**Arguments:**
+- `<port_number>` - listening port of tracker (optional, will be 8080 if not specified)
+
+This starts the tracker listening on `http://<tracker_ip>:<port_number>/announce`
 
 ### Tracker Functionality
 
@@ -155,11 +158,12 @@ The tracker will:
 
 ### Basic Usage
 ```bash
-./torrent_client <torrent_file>
+./torrent_client <torrent_file> <port_number>
 ```
 
 **Arguments:**
 - `<torrent_file>` - Path to .torrent file (must end with .torrent extension)
+- `<port_number>` - listening port of client (optional, will randomly assign if not specified)
 
 ### Complete Example Workflow
 
@@ -167,7 +171,7 @@ The tracker will:
 
 **Terminal 1 - Start Tracker:**
 ```bash
-./tracker
+./tracker <port>
 ```
 
 **Terminal 2 - Start First Client (Seeder):**
@@ -188,11 +192,6 @@ The tracker will:
 # Another leecher
 ./torrent_client video.mov.torrent
 ```
-
-## Command Line Options
-
-**Current Options:**
-- `<torrent_file>` - Path to .torrent file (required)
 
 **File Requirements:**
 - Must exist
@@ -271,11 +270,13 @@ The implementation has been tested with:
 1. Single seeder → single leecher
 2. Multiple simultaneous leechers (2+ clients downloading at once)
 3. Leecher becoming seeder after completion
+4. Leeching over LAN (leecher on one computer, seeder and tracker on the other)
 
 ## Known Limitations
 
 - Windows compatibility untested/unlikely to work fully due to POSIX signals and thread weirdness
 - Shutdown of clients is not very graceful, just detaching peer threads due to time's sake
+- Very little input handling in regards to port numbers, but this is not production software so that's okay
 
 ## References
 
