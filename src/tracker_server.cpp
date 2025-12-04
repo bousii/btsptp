@@ -9,7 +9,6 @@ using namespace std;
 using boost::asio::ip::tcp;
 
 
-#define TRACKER_PORT 8080
 
 void send_response(tcp::socket &socket, const string &data)
 {
@@ -21,7 +20,6 @@ void send_response(tcp::socket &socket, const string &data)
 	boost::asio::write(socket, boost::asio::buffer(http_header));
 	boost::asio::write(socket, boost::asio::buffer(data));
 }
-
 
 void handle_client(tcp::socket &socket, Tracker &tracker)
 {
@@ -89,13 +87,24 @@ void handle_client(tcp::socket &socket, Tracker &tracker)
 	}
 }
 
-int main()
+int main(int argc, char *argv[])
 {
+	if (argc > 2) {
+        cout << "usage: " << argv[0] << "<optional_tracker_port>" << endl;
+		return 1;
+	}
+	
+	int tracker_port = 8080;
+
+	if (argc == 2) {
+		tracker_port = atoi(argv[1]);
+	}
+
 	try {
 		boost::asio::io_context io;
-        tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), TRACKER_PORT));
+        tcp::acceptor acceptor(io, tcp::endpoint(tcp::v4(), tracker_port));
 
-		cout << "tracker listening on port " << TRACKER_PORT << endl;
+		cout << "tracker listening on port " << tracker_port << endl;
 		Tracker tracker;
 		while(1) {
 			tcp::socket socket(io);
