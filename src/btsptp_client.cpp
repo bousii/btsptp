@@ -264,10 +264,15 @@ int main(int argc, char *argv[])
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    if (argc != 2) {
-        cout << "usage: " << argv[0] << " <torrent_file>" << endl;
+    if (argc > 3) {
+        cout << "usage: " << argv[0] << " <torrent_file>" << " <optional_listening_port> " << endl;
         return 1;
     }
+
+	int acceptor_port = 0;
+	if (argc == 3) {
+		acceptor_port = atoi(argv[2]);
+	}
 
     string filename(argv[1]);
     if (!boost::algorithm::ends_with(filename, ".torrent")) {
@@ -288,7 +293,7 @@ int main(int argc, char *argv[])
 
         boost::asio::ip::tcp::acceptor acceptor(
             io,
-            boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 0)
+            boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), acceptor_port)
         );
         uint16_t our_port = acceptor.local_endpoint().port();
         cout << "listening on port: " << our_port << endl;
