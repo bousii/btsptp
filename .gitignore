@@ -1,6 +1,4 @@
 /build/
 /*.o
 compile_commands.json
-torrent_client
-tracker
 
