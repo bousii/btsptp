@@ -6,6 +6,8 @@
 #include <iostream>
 #include <utils.hpp>
 #include <peer_info.hpp>
+#include <peer_connection.hpp>
+#include <chrono>
 
 using namespace std;
 
@@ -55,7 +57,6 @@ tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_ur
 		throw boost::system::system_error(ec);
 	}
 
-	/* Parse headers using istream */
 	std::istream response_stream(&response_buf);
 	std::string http_version;
 	unsigned int status_code;
@@ -72,8 +73,6 @@ tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_ur
 			content_length = std::stoul(header_line.substr(16));
 		}
 	}
-	
-	std::cout << "Content-Length from header: " << content_length << std::endl;
 
 	/*
 	 * At this point, response_buf still contains any body data that came with headers
@@ -87,7 +86,7 @@ tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_ur
 		size_t remaining = content_length - body_in_buffer;
 		std::cout << "Reading remaining: " << remaining << " bytes" << std::endl;
 		
-		boost::asio::read(tracker_socket, response_buf, 
+		boost::asio::read(tracker_socket, response_buf,
 						  boost::asio::transfer_exactly(remaining), ec);
 		if (ec) {
 			throw boost::system::system_error(ec);
@@ -182,9 +181,107 @@ int main(int argc, char *argv[])
 			tracker_resp resp = announce_to_tracker(io, torrent.announce_url, announce_request);
 			cout << "INTERVAL " << resp.interval << endl;
 			for (PeerInfo peer : resp.peer_list) {
-				cout << "Peer ID: " << peer.peer_id << endl;
+				cout << "peer id: " << peer.peer_id << endl;
 			}
+		vector<thread> peer_threads;
 
+		thread acceptor_thread([&]() {
+			cout << "acceptor thread started" << endl;
+			while(1) {
+				try {
+					boost::asio::ip::tcp::socket sock(io);
+					acceptor.accept(sock);
+	
+					peer_threads.push_back(thread([&, sock = std::move(sock)]() mutable {
+	                    try {
+	                        PeerConnection conn(io, PeerInfo("", "", 0), state, peer_id, torrent.info_hash);
+	                        conn.start_with_socket(std::move(sock));
+	                        conn.receive_handshake();  /* response */
+	                        conn.run();
+	                    } catch (const exception& e) {
+	                        cerr << "Incoming peer error: " << e.what() << endl;
+	                    }
+	                }));
+	            } catch (const exception& e) {
+	                cerr << "Acceptor error: " << e.what() << endl;
+	            }
+			}
+		});
+		acceptor_thread.detach();
+
+		if (!state.is_file_complete()) {
+			cout << "=== connecting to peers ===" << endl;
+
+        	for (const PeerInfo& peer : resp.peer_list) {
+	            peer_threads.push_back(thread([&, peer]() {
+	                try {
+	                    cout << "connecting to peer: " << peer.ip << ":" << peer.port << endl;
+	
+	                    PeerConnection conn(io, peer, state, peer_id, torrent.info_hash);
+	                    conn.connect();
+	                    conn.send_handshake(); /* initate */
+	                    conn.run();
+	                } catch (const exception& e) {
+	                    cerr << "outgoing peer error (" << peer.ip << "): " << e.what() << endl;
+	                }
+	            }));
+        	}
+		} else {
+			cout << "file already complete, seeding only now" << endl;
+		}
+
+		if (!state.is_file_complete()) {
+			cout << "=== Downloading ===" << endl;
+			
+			while (!state.is_file_complete()) {
+				this_thread::sleep_for(chrono::seconds(5));
+				
+				size_t left = state.bytes_left();
+				cout << "progress: " << left << " bytes remaining" << endl;
+			}
+			
+			cout << "\n=== download complete! ===\n" << endl;
+			
+			/* Announce completion */
+			string complete_request = build_announce_request(
+				torrent.announce_url,
+				torrent.info_hash,
+				peer_id,
+				our_port,
+				0,
+				0,
+				0,
+				"completed"
+			);
+			
+			announce_to_tracker(io, torrent.announce_url, complete_request);
+		}
+
+		cout << "=== Seeding ===" << endl;
+		cout << "Press Ctrl+C to exit" << endl;
+		
+		while (true) {
+			this_thread::sleep_for(chrono::seconds(resp.interval));
+			
+			/* reannounce */
+			string seeding_request = build_announce_request(
+				torrent.announce_url,
+				torrent.info_hash,
+				peer_id,
+				our_port,
+				0,
+				0,
+				0,
+				""
+			);
+			
+			try {
+				announce_to_tracker(io, torrent.announce_url, seeding_request);
+				cout << "Re-announced to tracker" << endl;
+			} catch (const exception& e) {
+				cerr << "Re-announce failed: " << e.what() << endl;
+			}
+		}
     } catch (const exception& e) {
         cerr << "error: " << e.what() << endl;
         return 1;
