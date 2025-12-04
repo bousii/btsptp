@@ -15,9 +15,19 @@ std::string Tracker::handle_announce(const std::string &info_hash,
 	PeerInfo peer(peer_id, ip, port);
 	peer.last_announce = time(nullptr);
 	peer.status = event;
-
-	update_peer(info_hash, peer);
-	return generate_response(info_hash, peer.peer_id);
+    if (event == "stopped") {
+        auto& peer_list = torrents[info_hash];
+        peer_list.erase(
+            std::remove_if(peer_list.begin(), peer_list.end(),
+                [&peer_id](const PeerInfo& p) { return p.peer_id == peer_id; }),
+            peer_list.end()
+        );
+		cleanup_inactive_peers();
+    } else {
+		update_peer(info_hash, peer);
+		cleanup_inactive_peers();
+	}
+	return generate_response(info_hash, peer_id);
 }
 
 std::string Tracker::generate_response(const std::string &info_hash, const std::string &caller_id)
