@@ -65,6 +65,10 @@ This is a functional BitTorrent client implementation that supports downloading 
 ```bash
    sudo apt-get install make
 ```
+  - Install on macOS:
+```bash
+     brew install make
+```
 
 ### For Creating Torrents
 
