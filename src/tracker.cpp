@@ -1,5 +1,5 @@
 #include <bencode.hpp>
-#include <peer.hpp>
+#include <peer_info.hpp>
 #include <tracker.hpp>
 #include <algorithm>
 

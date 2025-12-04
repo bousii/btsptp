@@ -1,5 +1,5 @@
-#ifndef PEER_H
-#define PEER_H
+#ifndef PEER_INFO_H
+#define PEER_INFO_H
 
 #include <string>
 #include <cstdint>
@@ -16,4 +16,4 @@ public:
 	PeerInfo(std::string id, std::string ip, uint16_t port);
 };
 
-#endif /* peer.hpp */
+#endif /* peer_info.hpp */

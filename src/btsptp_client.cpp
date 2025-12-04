@@ -2,9 +2,10 @@
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <torrent_metadata.hpp>
+#include <torrent_state.hpp>
 #include <iostream>
 #include <utils.hpp>
-#include <peer.hpp>
+#include <peer_info.hpp>
 
 using namespace std;
 
@@ -99,7 +100,6 @@ tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_ur
 	};
 	
 	std::cout << "Final body size: " << body.size() << std::endl;
-	std::cout << "First 100 chars of body: " << body.substr(0, 100) << std::endl;
 
 	/* Parse bencoded response */
 	auto data = bencode::decode(body);
@@ -134,8 +134,9 @@ tracker_resp announce_to_tracker(boost::asio::io_context &io, string announce_ur
 }
 
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
+int main(int argc, char *argv[])
+{
+	if (argc < 2) {
         cout << "too few arguments for this program" << endl;
         return 1;
     }
@@ -159,27 +160,30 @@ int main(int argc, char *argv[]) {
         TorrentMetadata torrent(filename);
         torrent.print_info();
 
-        string peer_id = generate_peer_id();
-        cout << "our peer ID: " << peer_id << endl;
-
-        uint16_t our_port = acceptor.local_endpoint().port();
-        string announce_request = build_announce_request(
-            torrent.announce_url,
-            torrent.info_hash,
-            peer_id,
-            our_port,
-            0,                      /* uploaded */
-            0,                      /* downloaded */
-            torrent.file_length,    /* left */
-            "started"               /* event */
-        );
-
-        cout << "=== announce request ===" << endl;
-        cout << announce_request << endl;
-
-		tracker_resp resp = announce_to_tracker(io, torrent.announce_url, announce_request);
-
-
+		TorrentState state(torrent, torrent.file_name);
+	        string peer_id = generate_peer_id();
+	        cout << "our peer ID: " << peer_id << endl;
+	
+	        uint16_t our_port = acceptor.local_endpoint().port();
+	        string announce_request = build_announce_request(
+	            torrent.announce_url,
+	            torrent.info_hash,
+	            peer_id,
+	            our_port,
+	            0,                      /* uploaded */
+	            0,                      /* downloaded */
+	            state.bytes_left(),    /* left */
+	            "started"               /* event */
+	        );
+	
+	        cout << "=== announce request ===" << endl;
+	        cout << announce_request << endl;
+	
+			tracker_resp resp = announce_to_tracker(io, torrent.announce_url, announce_request);
+			cout << "INTERVAL " << resp.interval << endl;
+			for (PeerInfo peer : resp.peer_list) {
+				cout << "Peer ID: " << peer.peer_id << endl;
+			}
 
     } catch (const exception& e) {
         cerr << "error: " << e.what() << endl;

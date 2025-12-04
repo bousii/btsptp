@@ -5,7 +5,8 @@
 #include <random>
 #include <ctime>
 
-HttpRequest parse_http_request_line(const std::string& request_line) {
+HttpRequest parse_http_request_line(const std::string& request_line)
+{
     std::istringstream line_stream(request_line);
     HttpRequest req;
     line_stream >> req.method >> req.path >> req.http_version;
@@ -15,13 +16,15 @@ HttpRequest parse_http_request_line(const std::string& request_line) {
     return req;
 }
 
-std::string sha1_hash(const std::string &data) {
+std::string sha1_hash(const std::string &data)
+{
     unsigned char hash[SHA_DIGEST_LENGTH];
     SHA1((unsigned char*)data.c_str(), data.length(), hash);
     return std::string((char*)hash, SHA_DIGEST_LENGTH);
 }
 
-std::string hash_to_hex(const std::string &hash) {
+std::string hash_to_hex(const std::string &hash)
+{
     std::stringstream ss;
     for (unsigned char c : hash) {
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)c;
@@ -29,7 +32,8 @@ std::string hash_to_hex(const std::string &hash) {
     return ss.str();
 }
 
-std::string url_encode(const std::string &str) {
+std::string url_encode(const std::string &str)
+{
     std::ostringstream escaped;
     escaped.fill('0');
     escaped << std::hex;
@@ -47,7 +51,8 @@ std::string url_encode(const std::string &str) {
     return escaped.str();
 }
 
-std::string url_decode(const std::string &str) {
+std::string url_decode(const std::string &str)
+{
     std::string result;
     for (size_t i = 0; i < str.length(); i++) {
         if (str[i] == '%' && i + 2 < str.length()) {
@@ -95,7 +100,8 @@ URL parse_url(const std::string &url)
     return out;
 }
 
-std::unordered_map<std::string, std::string> parse_query_params(const std::string &query) {
+std::unordered_map<std::string, std::string> parse_query_params(const std::string &query)
+{
     std::unordered_map<std::string, std::string> params;
     std::istringstream iss(query);
     std::string pair;
@@ -116,7 +122,8 @@ std::unordered_map<std::string, std::string> parse_query_params(const std::strin
  * Generate random peer_id (20 bytes)
  * Format: -PC0001-XXXXXXXXXXXX (per convention)
  */
-std::string generate_peer_id() {
+std::string generate_peer_id()
+{
     std::string peer_id = "-PC0001-";  /* Client ID: PC version 0.0.1 */
     const char charset[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     std::mt19937 rng(std::time(nullptr));
@@ -137,7 +144,8 @@ std::string build_announce_request(const std::string &announce_url,
                                    int64_t uploaded,
                                    int64_t downloaded,
                                    int64_t left,
-                                   const std::string &event) {
+                                   const std::string &event)
+{
     std::ostringstream url;
     url << announce_url;
 
@@ -159,4 +167,35 @@ std::string build_announce_request(const std::string &announce_url,
     }
 
     return url.str();
+}
+
+/*
+ * Convert vector<bool> to packed bytes for wire protocol.
+ * vector<bool> is weird and literally stores every bool as 1 bit
+ * instead of a byte like most other instances of bool 
+ */
+std::string pack_bitfield(const std::vector<bool>& pieces)
+{
+    std::string packed;
+    for (size_t i = 0; i < pieces.size(); i += 8) {
+        uint8_t byte = 0;
+        for (int bit = 0; bit < 8 && i + bit < pieces.size(); bit++) {
+            if (pieces[i + bit]) {
+                byte |= (1 << (7 - bit));
+            }
+        }
+        packed += byte;
+    }
+    return packed;
+}
+
+/* Same as above but opposite */
+std::vector<bool> unpack_bitfield(const std::string& packed, size_t num_pieces)
+{
+    std::vector<bool> pieces(num_pieces, false);
+    for (size_t i = 0; i < num_pieces && i / 8 < packed.size(); i++) {
+        uint8_t byte = packed[i / 8];
+        pieces[i] = (byte & (1 << (7 - (i % 8)))) != 0;
+    }
+    return pieces;
 }

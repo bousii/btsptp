@@ -3,7 +3,7 @@
 
 #include <unordered_map>
 #include <vector>
-#include <peer.hpp>
+#include <peer_info.hpp>
 
 #define ANNOUNCE_INTERVAL 30
 #define PEER_TIMEOUT 120

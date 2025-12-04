@@ -22,4 +22,4 @@ private:
     void calculate_info_hash(const std::string& bencoded_info);
 };
 
-#endif
+#endif /* torrent_metadata.hpp */
